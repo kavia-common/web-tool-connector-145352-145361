@@ -25,12 +25,22 @@ class Settings(BaseSettings):
         env="CORS_ORIGINS"
     )
     
-    # Atlassian OAuth (for future implementation)
+    # Atlassian OAuth 2.0 (3LO) Configuration
+    atlassian_client_id: str = Field(default="", env="ATLASSIAN_CLIENT_ID")
+    atlassian_client_secret: str = Field(default="", env="ATLASSIAN_CLIENT_SECRET")
+    redirect_uri: str = Field(default="http://localhost:8000/auth/callback", env="REDIRECT_URI")
+    
+    # Individual service OAuth (optional, fallback to main Atlassian app)
     jira_client_id: str = Field(default="", env="JIRA_CLIENT_ID")
     jira_client_secret: str = Field(default="", env="JIRA_CLIENT_SECRET")
     confluence_client_id: str = Field(default="", env="CONFLUENCE_CLIENT_ID")
     confluence_client_secret: str = Field(default="", env="CONFLUENCE_CLIENT_SECRET")
     oauth_redirect_uri: str = Field(default="http://localhost:8000/auth/callback", env="OAUTH_REDIRECT_URI")
+    
+    # OAuth URLs
+    atlassian_auth_url: str = Field(default="https://auth.atlassian.com/authorize", env="ATLASSIAN_AUTH_URL")
+    atlassian_token_url: str = Field(default="https://auth.atlassian.com/oauth/token", env="ATLASSIAN_TOKEN_URL")
+    atlassian_api_url: str = Field(default="https://api.atlassian.com", env="ATLASSIAN_API_URL")
     
     class Config:
         env_file = ".env"

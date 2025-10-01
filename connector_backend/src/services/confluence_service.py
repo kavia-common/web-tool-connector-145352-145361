@@ -45,9 +45,15 @@ class ConfluenceService:
                 "Accept": "application/json"
             }
     
-    def test_connection(self, base_url: str) -> Tuple[ConnectionStatus, str]:
-        """Test connection to Confluence instance."""
+    def test_connection(self, base_url: str = None, oauth_mode: bool = False) -> Tuple[ConnectionStatus, str]:
+        """Test connection to Confluence instance using credentials or OAuth."""
         try:
+            if oauth_mode:
+                # Import here to avoid circular import
+                from src.services.oauth_service import oauth_service
+                from src.models import ServiceType
+                return oauth_service.test_oauth_connection(ServiceType.CONFLUENCE)
+            
             # Get stored credentials
             credentials = credential_service.get_decrypted_credentials("confluence", base_url)
             if not credentials:
@@ -78,13 +84,37 @@ class ConfluenceService:
             logger.error(f"Confluence connection test failed: {str(e)}")
             return ConnectionStatus.ERROR, f"Connection test failed: {str(e)}"
     
-    def get_spaces(self, base_url: str) -> Tuple[List[ProjectData], Optional[str]]:
-        """Fetch spaces from Confluence instance (treating spaces as 'projects')."""
+    def get_spaces(self, base_url: str = None, oauth_mode: bool = False) -> Tuple[List[ProjectData], Optional[str]]:
+        """Fetch spaces from Confluence instance using credentials or OAuth."""
         try:
-            # Get stored credentials
-            credentials = credential_service.get_decrypted_credentials("confluence", base_url)
-            if not credentials:
-                return [], "No credentials found for this Confluence instance"
+            if oauth_mode:
+                # Import here to avoid circular import
+                from src.services.oauth_service import oauth_service
+                from src.models import ServiceType
+                
+                # Get accessible resources and use first one
+                resources, error = oauth_service.get_accessible_resources(ServiceType.CONFLUENCE)
+                if error or not resources:
+                    return [], error or "No accessible Confluence resources found"
+                
+                # Use first accessible resource
+                resource = resources[0]
+                base_url = resource.get("url")
+                
+                # Get OAuth tokens
+                tokens = oauth_service.get_oauth_tokens(ServiceType.CONFLUENCE)
+                if not tokens:
+                    return [], "No OAuth tokens found"
+                
+                credentials = {
+                    "auth_method": "oauth",
+                    "access_token": tokens["access_token"]
+                }
+            else:
+                # Get stored credentials
+                credentials = credential_service.get_decrypted_credentials("confluence", base_url)
+                if not credentials:
+                    return [], "No credentials found for this Confluence instance"
             
             # Fetch spaces
             url = urljoin(base_url, "/rest/api/space")

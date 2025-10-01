@@ -37,8 +37,8 @@ class CredentialsRequest(BaseModel):
     username: str = Field(..., description="Username or email")
     password: str = Field(..., description="Password or API token")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "service_type": "jira",
                 "base_url": "https://your-domain.atlassian.net",
@@ -47,18 +47,20 @@ class CredentialsRequest(BaseModel):
                 "password": "your-api-token"
             }
         }
+    }
 
 
 class ConnectionTestRequest(BaseModel):
     """Request model for testing connection."""
     service_type: ServiceType = Field(..., description="Type of service to test")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "service_type": "jira"
             }
         }
+    }
 
 
 # Response Models
@@ -71,8 +73,8 @@ class ConnectionResponse(BaseModel):
     username: Optional[str] = None
     connected_at: Optional[datetime] = None
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "service_type": "jira",
                 "status": "connected",
@@ -82,6 +84,7 @@ class ConnectionResponse(BaseModel):
                 "connected_at": "2024-01-15T10:30:00Z"
             }
         }
+    }
 
 
 class ProjectData(BaseModel):
@@ -95,8 +98,8 @@ class ProjectData(BaseModel):
     avatar_url: Optional[str] = Field(None, description="Project avatar URL")
     lead: Optional[Dict[str, Any]] = Field(None, description="Project lead information")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "id": "10001",
                 "key": "DEMO",
@@ -111,6 +114,7 @@ class ProjectData(BaseModel):
                 }
             }
         }
+    }
 
 
 class ProjectsResponse(BaseModel):
@@ -119,8 +123,8 @@ class ProjectsResponse(BaseModel):
     projects: List[ProjectData]
     total_count: int
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "service_type": "jira",
                 "projects": [
@@ -136,6 +140,7 @@ class ProjectsResponse(BaseModel):
                 "total_count": 1
             }
         }
+    }
 
 
 class ErrorResponse(BaseModel):
@@ -144,8 +149,8 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., description="Error message")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "error": "authentication_failed",
                 "message": "Invalid credentials provided",
@@ -155,6 +160,7 @@ class ErrorResponse(BaseModel):
                 }
             }
         }
+    }
 
 
 class HealthResponse(BaseModel):
@@ -164,8 +170,8 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(..., description="Response timestamp")
     version: str = Field(..., description="API version")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "status": "healthy",
                 "message": "Connector backend is running",
@@ -173,7 +179,71 @@ class HealthResponse(BaseModel):
                 "version": "1.0.0"
             }
         }
+    }
 
+
+# OAuth Models
+class OAuthInitRequest(BaseModel):
+    """Request model for initiating OAuth flow."""
+    service_type: ServiceType = Field(..., description="Type of service for OAuth")
+    state: Optional[str] = Field(None, description="Optional state parameter for OAuth security")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "service_type": "jira",
+                "state": "random-secure-state-value"
+            }
+        }
+    }
+
+
+class OAuthInitResponse(BaseModel):
+    """Response model for OAuth initialization."""
+    auth_url: str = Field(..., description="Authorization URL to redirect user to")
+    state: str = Field(..., description="State parameter for OAuth security")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "auth_url": "https://auth.atlassian.com/authorize?...",
+                "state": "random-secure-state-value"
+            }
+        }
+    }
+
+
+class OAuthCallbackRequest(BaseModel):
+    """Request model for OAuth callback."""
+    code: str = Field(..., description="Authorization code from OAuth provider")
+    state: str = Field(..., description="State parameter for verification")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "code": "oauth-authorization-code",
+                "state": "random-secure-state-value"
+            }
+        }
+    }
+
+
+class OAuthTokenResponse(BaseModel):
+    """Response model for OAuth token exchange."""
+    access_token: str = Field(..., description="Access token")
+    refresh_token: Optional[str] = Field(None, description="Refresh token")
+    expires_in: Optional[int] = Field(None, description="Token expiration in seconds")
+    scope: Optional[str] = Field(None, description="Token scope")
+
+
+class SessionInfo(BaseModel):
+    """Session information model."""
+    session_id: str = Field(..., description="Session identifier")
+    service_type: ServiceType = Field(..., description="Service type")
+    user_info: Dict[str, Any] = Field(..., description="User information")
+    created_at: datetime = Field(..., description="Session creation time")
+    expires_at: Optional[datetime] = Field(None, description="Session expiration time")
+    
 
 # Internal Models for Credential Storage
 class StoredCredentials(BaseModel):
@@ -186,4 +256,18 @@ class StoredCredentials(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_tested_at: Optional[datetime] = None
+    is_active: bool = True
+
+
+class StoredOAuthTokens(BaseModel):
+    """Internal model for stored OAuth tokens."""
+    service_type: ServiceType
+    access_token: str
+    refresh_token: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    scope: Optional[str] = None
+    accessible_resources: Optional[List[Dict[str, Any]]] = None
+    user_info: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
     is_active: bool = True

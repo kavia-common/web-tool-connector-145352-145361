@@ -23,11 +23,21 @@ class JiraService:
     def _get_auth_headers(self, credentials: Dict[str, str]) -> Dict[str, str]:
         """Generate authentication headers based on auth method."""
         auth_method = credentials.get("auth_method", "basic")
-        username = credentials["username"]
-        password = credentials["password"]
         
-        if auth_method == "api_token":
+        if auth_method == "oauth":
+            # OAuth Bearer token
+            access_token = credentials.get("access_token")
+            if not access_token:
+                raise ValueError("OAuth access token not found")
+            return {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        elif auth_method == "api_token":
             # For API token, use email:token as basic auth
+            username = credentials["username"]
+            password = credentials["password"]
             auth_string = f"{username}:{password}"
             encoded_auth = base64.b64encode(auth_string.encode()).decode()
             return {
@@ -37,6 +47,8 @@ class JiraService:
             }
         else:
             # Basic authentication
+            username = credentials["username"]
+            password = credentials["password"]
             auth_string = f"{username}:{password}"
             encoded_auth = base64.b64encode(auth_string.encode()).decode()
             return {
@@ -45,9 +57,15 @@ class JiraService:
                 "Accept": "application/json"
             }
     
-    def test_connection(self, base_url: str) -> Tuple[ConnectionStatus, str]:
-        """Test connection to JIRA instance."""
+    def test_connection(self, base_url: str = None, oauth_mode: bool = False) -> Tuple[ConnectionStatus, str]:
+        """Test connection to JIRA instance using credentials or OAuth."""
         try:
+            if oauth_mode:
+                # Import here to avoid circular import
+                from src.services.oauth_service import oauth_service
+                from src.models import ServiceType
+                return oauth_service.test_oauth_connection(ServiceType.JIRA)
+            
             # Get stored credentials
             credentials = credential_service.get_decrypted_credentials("jira", base_url)
             if not credentials:
@@ -78,13 +96,37 @@ class JiraService:
             logger.error(f"JIRA connection test failed: {str(e)}")
             return ConnectionStatus.ERROR, f"Connection test failed: {str(e)}"
     
-    def get_projects(self, base_url: str) -> Tuple[List[ProjectData], Optional[str]]:
-        """Fetch projects from JIRA instance."""
+    def get_projects(self, base_url: str = None, oauth_mode: bool = False) -> Tuple[List[ProjectData], Optional[str]]:
+        """Fetch projects from JIRA instance using credentials or OAuth."""
         try:
-            # Get stored credentials
-            credentials = credential_service.get_decrypted_credentials("jira", base_url)
-            if not credentials:
-                return [], "No credentials found for this JIRA instance"
+            if oauth_mode:
+                # Import here to avoid circular import
+                from src.services.oauth_service import oauth_service
+                from src.models import ServiceType
+                
+                # Get accessible resources and use first one
+                resources, error = oauth_service.get_accessible_resources(ServiceType.JIRA)
+                if error or not resources:
+                    return [], error or "No accessible JIRA resources found"
+                
+                # Use first accessible resource
+                resource = resources[0]
+                base_url = resource.get("url")
+                
+                # Get OAuth tokens
+                tokens = oauth_service.get_oauth_tokens(ServiceType.JIRA)
+                if not tokens:
+                    return [], "No OAuth tokens found"
+                
+                credentials = {
+                    "auth_method": "oauth",
+                    "access_token": tokens["access_token"]
+                }
+            else:
+                # Get stored credentials
+                credentials = credential_service.get_decrypted_credentials("jira", base_url)
+                if not credentials:
+                    return [], "No credentials found for this JIRA instance"
             
             # Fetch projects
             url = urljoin(base_url, "/rest/api/3/project")
