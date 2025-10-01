@@ -1,0 +1,4 @@
+{
+    "command": "pytest",
+    "working_directory": "/home/kavia/workspace/code-generation/web-tool-connector-145352-145361/connector_backend"
+}
